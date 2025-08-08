@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Button Clicker — Local Save + Autoclicker</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#60a5fa;
+    --muted:#94a3b8;
+    --glass: rgba(255,255,255,0.03);
+    --success:#10b981;
+  }
+  *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071022 0%,#08102a 100%);color:#e6eef8}
+  .wrap{max-width:980px;margin:28px auto;padding:20px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}
+  h1{font-size:20px;margin:0;color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px}
+  main{display:grid;grid-template-columns:1fr 340px;gap:18px}
+  @media(max-width:880px){ main{grid-template-columns:1fr} }
+  .game-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:18px;box-shadow:0 6px 30px rgba(2,6,23,0.6); }
+  .big-panel{display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 16px;text-align:center}
+  .score{font-size:36px;font-weight:700}
+  .score small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+  .click-btn{
+    width:220px;height:220px;border-radius:50%;border:none;background:radial-gradient(circle at 30% 20%, #5aa9ff, #1e67e6 60%, #123c9b 100%);
+    color:white;font-size:22px;font-weight:700;cursor:pointer;box-shadow:0 10px 30px rgba(20,60,160,0.35), inset 0 -6px 20px rgba(0,0,0,0.25);
+    display:flex;align-items:center;justify-content:center;position:relative;user-select:none;
+  }
+  .click-btn:active{transform:translateY(2px);box-shadow:0 6px 20px rgba(12,42,120,0.35)}
+  .meta-row{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:6px;flex-wrap:wrap}
+  .stat{background:var(--glass);padding:10px;border-radius:8px;font-size:14px;color:var(--muted);min-width:120px}
+  .shop{display:flex;flex-direction:column;gap:10px}
+  .shop .item{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border:1px solid rgba(255,255,255,0.02)}
+  .shop .item button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#042;cursor:pointer;font-weight:700}
+  .shop .item button[disabled]{opacity:0.45;cursor:not-allowed}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .controls button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
+  label.small{font-size:12px;color:var(--muted)}
+  .footer-note{text-align:center;color:var(--muted);font-size:12px;margin-top:12px}
+  .float{position:absolute;pointer-events:none;font-weight:800;font-size:18px;opacity:0;color:var(--accent)}
+  .right-col{display:flex;flex-direction:column;gap:12px}
+  .panel-title{font-weight:700;color:var(--accent);margin-bottom:6px}
+  input[type="range"]{width:100%}
+  .tiny{font-size:13px;color:var(--muted)}
+  .green{color:var(--success);font-weight:700}
+  textarea{width:100%;height:70px;background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:inherit;resize:vertical}
+  .small-muted{font-size:12px;color:var(--muted)}
+  .kbd{background:rgba(255,255,255,0.03);border-radius:6px;padding:4px 8px;font-weight:700}
+  /* click animation */
+  @keyframes floatUp {
+    0%{transform:translateY(0);opacity:1}
+    100%{transform:translateY(-90px);opacity:0}
+  }
+  .floating {
+    animation: floatUp 900ms ease-out forwards;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Button Clicker</h1>
+      <div class="sub">Click the big button, buy upgrades, and build an autoclicker empire! (Autosaves)</div>
+    </div>
+    <div class="tiny">Keys: <span class="kbd">Space</span> = Click · <span class="kbd">A</span> = Buy Autoclicker</div>
+  </header>
+
+  <main>
+    <section class="game-card big-panel">
+      <div class="score" id="scoreDisplay">0 <small>cookies</small></div>
+
+      <button class="click-btn" id="clickBtn" aria-label="Click me">Click me!<div id="clickEffectContainer"></div></button>
+
+      <div class="meta-row">
+        <div class="stat">Per Click: <strong id="perClick">1</strong></div>
+        <div class="stat">Autoclickers: <strong id="autocount">0</strong></div>
+        <div class="stat">CPS (est): <strong id="cps">0</strong></div>
+      </div>
+
+      <div class="footer-note">Tip: Hold the mouse down or press Space repeatedly. Click animations enabled.</div>
+    </section>
+
+    <aside class="right-col">
+      <div class="game-card">
+        <div class="panel-title">Shop</div>
+        <div class="shop" id="shop">
+          <div class="item">
+            <div>
+              <div style="font-weight:700">Autoclicker</div>
+              <div class="small-muted">Automatically generates clicks every second</div>
+            </div>
+            <div>
+              <div style="text-align:right"><div class="tiny">Cost: <span id="autocost">50</span></div>
+              <button id="buyAuto">Buy</button></div>
+            </div>
+          </div>
+
+          <div class="item">
+            <div>
+              <div style="font-weight:700">Upgrade Click Power</div>
+              <div class="small-muted">Increase value per manual click</div>
+            </div>
+            <div>
+              <div style="text-align:right"><div class="tiny">Cost: <span id="powercost">20</span></div>
+              <button id="buyPower">Buy</button></div>
+            </div>
+          </div>
+
+          <div class="item">
+            <div>
+              <div style="font-weight:700">Autoclicker Speed</div>
+              <div class="small-muted">Increase autoclicks/sec (affects all autoclickers)</div>
+            </div>
+            <div>
+              <div style="text-align:right"><div class="tiny">Cost: <span id="speedcost">250</span></div>
+              <button id="buySpeed">Buy</button></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="panel-title">Game Controls</div>
+          <div class="controls">
+            <button id="saveBtn">Save</button>
+            <button id="loadBtn">Load</button>
+            <button id="exportBtn">Export</button>
+            <button id="importBtn">Import</button>
+            <button id="resetBtn" title="Reset to default">Reset</button>
+          </div>
+          <div style="margin-top:10px" class="small-muted">Autosave: <span id="autosaveStatus">On</span></div>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="panel-title">Stats & Info</div>
+        <div class="tiny">Total Clicks: <strong id="totalClicks">0</strong></div>
+        <div class="tiny">Total Earned: <strong id="totalEarned">0</strong></div>
+        <div style="margin-top:10px">
+          <div class="panel-title">Save Data (JSON)</div>
+          <textarea id="saveText" readonly></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="copySave">Copy</button>
+            <button id="clearClipboard">Clear</button>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+</div>
+
+<script>
+/*
+  Button Clicker Game
+  Features:
+  - Click to earn currency
+  - Autoclicker purchase (generates clicks per second)
+  - Click power upgrades
+  - Autoclicker speed upgrades
+  - Local save/load (localStorage)
+  - Export/import save JSON
+  - Click +1 floating animation
+  - Keyboard shortcuts: Space to click, A to buy autoclicker
+  - Autosave every 10s
+*/
+
+(() => {
+  const DEFAULT = {
+    score: 0,
+    perClick: 1,
+    autoclickers: 0,
+    autoclickerSpeed: 1, // clicks per autoclicker per second
+    totalClicks: 0,
+    totalEarned: 0,
+    boughtPowerUpgrades: 0,
+    boughtSpeedUpgrades: 0,
+  };
+  const SAVE_KEY = 'clicker-save-v1';
+  let state = {...DEFAULT};
+  let lastTick = Date.now();
+  let autoIntervalId = null;
+  let autoTickRate = 200; // ms tick granularity for smoother cps
+
+  // DOM
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const perClickEl = document.getElementById('perClick');
+  const autocountEl = document.getElementById('autocount');
+  const cpsEl = document.getElementById('cps');
+  const autocostEl = document.getElementById('autocost');
+  const powercostEl = document.getElementById('powercost');
+  const speedcostEl = document.getElementById('speedcost');
+  const buyAutoBtn = document.getElementById('buyAuto');
+  const buyPowerBtn = document.getElementById('buyPower');
+  const buySpeedBtn = document.getElementById('buySpeed');
+  const clickBtn = document.getElementById('clickBtn');
+  const clickEffectContainer = document.getElementById('clickEffectContainer');
+  const totalClicksEl = document.getElementById('totalClicks');
+  const totalEarnedEl = document.getElementById('totalEarned');
+  const saveText = document.getElementById('saveText');
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const copySaveBtn = document.getElementById('copySave');
+  const clearClipboardBtn = document.getElementById('clearClipboard');
+  const autosaveStatus = document.getElementById('autosaveStatus');
+
+  // Pricing formulas
+  function costAutoclicker(n) { return Math.floor(50 * Math.pow(1.17, n)); }
+  function costPower(n) { return Math.floor(20 * Math.pow(1.25, n)); }
+  function costSpeed(n) { return Math.floor(250 * Math.pow(1.3, n)); }
+
+  // Update UI
+  function updateUI(){
+    scoreDisplay.firstChild && scoreDisplay.removeChild(scoreDisplay.firstChild);
+    scoreDisplay.insertAdjacentText('afterbegin', Math.floor(state.score).toLocaleString());
+    perClickEl.textContent = state.perClick;
+    autocountEl.textContent = state.autoclickers;
+    autocostEl.textContent = costAutoclicker(state.autoclickers);
+    powercostEl.textContent = costPower(state.boughtPowerUpgrades);
+    speedcostEl.textContent = costSpeed(state.boughtSpeedUpgrades);
+    totalClicksEl.textContent = state.totalClicks;
+    totalEarnedEl.textContent = Math.floor(state.totalEarned);
+    const cps = (state.autoclickers * state.autoclickerSpeed).toFixed(2);
+    cpsEl.textContent = cps;
+    saveText.value = JSON.stringify(state, null, 2);
+    // enable/disable buy buttons
+    buyAutoBtn.disabled = state.score < costAutoclicker(state.autoclickers);
+    buyPowerBtn.disabled = state.score < costPower(state.boughtPowerUpgrades);
+    buySpeedBtn.disabled = state.score < costSpeed(state.boughtSpeedUpgrades);
+  }
+
+  // Click action
+  function doClick(count=1){
+    const gain = count * state.perClick;
+    state.score += gain;
+    state.totalEarned += gain;
+    state.totalClicks += count;
+    spawnFloating('+ ' + Math.floor(gain));
+    updateUI();
+  }
+
+  // Floating +1 animation
+  function spawnFloating(text){
+    const el = document.createElement('div');
+    el.className = 'float floating';
+    el.style.left = (50 + (Math.random()*80-40)) + 'px';
+    el.style.top = (50 + (Math.random()*40-20)) + 'px';
+    el.textContent = text;
+    // small random color shift
+    el.style.color = 'white';
+    clickEffectContainer.appendChild(el);
+    // remove after animation
+    setTimeout(()=> el.remove(), 950);
+  }
+
+  // Shop actions
+  function buyAutoclicker(){
+    const cost = costAutoclicker(state.autoclickers);
+    if (state.score < cost) return;
+    state.score -= cost;
+    state.autoclickers += 1;
+    updateUI();
+  }
+  function buyPower(){
+    const cost = costPower(state.boughtPowerUpgrades);
+    if (state.score < cost) return;
+    state.score -= cost;
+    state.boughtPowerUpgrades += 1;
+    state.perClick = Math.floor( state.perClick * 1.6 + 1 ); // growth
+    updateUI();
+  }
+  function buySpeed(){
+    const cost = costSpeed(state.boughtSpeedUpgrades);
+    if (state.score < cost) return;
+    state.score -= cost;
+    state.boughtSpeedUpgrades += 1;
+    state.autoclickerSpeed = +(state.autoclickerSpeed * 1.2).toFixed(2);
+    updateUI();
+  }
+
+  // Autoclick handling (tick-based)
+  function startAutoclicker(){
+    if (autoIntervalId) clearInterval(autoIntervalId);
+    autoIntervalId = setInterval(() => {
+      // accumulate fractional clicks depending on tick rate
+      const now = Date.now();
+      const dt = (now - lastTick) / 1000; // seconds
+      lastTick = now;
+      const clicks = state.autoclickers * state.autoclickerSpeed * dt;
+      if (clicks >= 0.0001){
+        doClick(clicks);
+      }
+    }, autoTickRate);
+  }
+
+  // Save/load
+  function save(){
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      autosaveStatus.textContent = 'On (saved ' + new Date().toLocaleTimeString() + ')';
+    } catch(e){ console.error('Save failed', e); autosaveStatus.textContent = 'Error saving'; }
+    updateUI();
+  }
+  function load(){
+    try {
+      const s = localStorage.getItem(SAVE_KEY);
+      if (!s) return false;
+      const parsed = JSON.parse(s);
+      state = Object.assign({}, DEFAULT, parsed);
+      updateUI();
+      return true;
+    } catch(e){ console.error('Load failed', e); return false; }
+  }
+  function reset(){
+    if (!confirm('Reset your save? This cannot be undone.')) return;
+    state = {...DEFAULT};
+    save();
+    updateUI();
+  }
+
+  // Export/Import
+  function exportSave(){
+    const data = JSON.stringify(state);
+    // download as file
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'clicker-save.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importSave(){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = () => {
+      const f = input.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (confirm('Load this save (will overwrite current save)?')) {
+            state = Object.assign({}, DEFAULT, parsed);
+            save();
+            updateUI();
+            alert('Save loaded.');
+          }
+        } catch(e){ alert('Invalid JSON file'); }
+      };
+      reader.readAsText(f);
+    };
+    input.click();
+  }
+
+  // Copy save text to clipboard
+  async function copySaveText(){
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(state));
+      alert('Save copied to clipboard');
+    } catch(e){ alert('Copy failed'); }
+  }
+  function clearClipboardFake(){
+    // can't actually clear clipboard reliably; just clear displayed textarea
+    saveText.value = '';
+  }
+
+  // Event bindings
+  clickBtn.addEventListener('click', () => doClick(1));
+  clickBtn.addEventListener('mousedown', () => { clickBtn.classList.add('held') });
+  clickBtn.addEventListener('mouseup', () => { clickBtn.classList.remove('held') });
+
+  // Hold to auto-fire manual clicks (fast clicking)
+  let holdClickInterval = null;
+  clickBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (holdClickInterval) clearInterval(holdClickInterval);
+    holdClickInterval = setInterval(() => doClick(1), 120); // repeated clicks while held
+  });
+  window.addEventListener('pointerup', ()=>{
+    if (holdClickInterval) clearInterval(holdClickInterval);
+    holdClickInterval = null;
+  });
+
+  buyAutoBtn.addEventListener('click', buyAutoclicker);
+  buyPowerBtn.addEventListener('click', buyPower);
+  buySpeedBtn.addEventListener('click', buySpeed);
+  saveBtn.addEventListener('click', save);
+  loadBtn.addEventListener('click', () => { if(!load()) alert('No save found.'); });
+  resetBtn.addEventListener('click', reset);
+  exportBtn.addEventListener('click', exportSave);
+  importBtn.addEventListener('click', importSave);
+  copySaveBtn.addEventListener('click', copySaveText);
+  clearClipboardBtn.addEventListener('click', clearClipboardFake);
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); doClick(1); }
+    if (e.key === 'a' || e.key === 'A') { buyAutoclicker(); }
+  });
+
+  // Autosave every 10 seconds
+  setInterval(save, 10000);
+
+  // Start
+  function init(){
+    const loaded = load();
+    lastTick = Date.now();
+    startAutoclicker();
+    updateUI();
+  }
+  init();
+
+})();
+</script>
+</body>
+</html>
