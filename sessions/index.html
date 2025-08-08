@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Create Session Page</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  input, textarea, button { margin: 5px 0; padding: 10px; width: 100%; }
+</style>
+</head>
+<body>
+<h1>Create a Session Page</h1>
+<p>Enter a session name (no spaces) and the HTML content for that page.</p>
+
+<label>Session Name</label>
+<input type="text" id="sessionName" placeholder="example">
+
+<label>Page HTML Content</label>
+<textarea id="pageContent" rows="6"><h1>Hello Session!</h1><p>This is your custom session page.</p></textarea>
+
+<button onclick="createSession()">Create Page</button>
+
+<p id="status"></p>
+
+<script>
+const token = "YOUR_FINE_GRAINED_PAT"; // From alt GitHub account
+const repoOwner = "AltAccountUsername";
+const repoName = "YourRepoName";
+
+async function createSession() {
+  const sessionName = document.getElementById("sessionName").value.trim();
+  const htmlContent = document.getElementById("pageContent").value;
+  const status = document.getElementById("status");
+
+  if (!sessionName) {
+    status.innerHTML = "<span style='color:red'>Please enter a session name.</span>";
+    return;
+  }
+
+  status.textContent = "Creating page...";
+
+  const path = `sessions/${sessionName}/index.html`;
+  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${path}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Authorization": `token ${token}`,
+        "Accept": "application/vnd.github.v3+json"
+      },
+      body: JSON.stringify({
+        message: `Create session page ${sessionName}`,
+        content: btoa(unescape(encodeURIComponent(htmlContent))) // base64 encode
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.status === 201 || res.status === 200) {
+      status.innerHTML = `
+        ✅ Page created!<br>
+        It will be live in ~1 minute:<br>
+        <a href="https://${repoOwner}.github.io/${repoName}/sessions/${sessionName}/" target="_blank">
+          ${repoOwner}.github.io/${repoName}/sessions/${sessionName}/
+        </a>
+      `;
+    } else {
+      status.innerHTML = `<span style='color:red'>Error: ${data.message}</span>`;
+      console.error(data);
+    }
+  } catch (err) {
+    status.innerHTML = `<span style='color:red'>Request failed.</span>`;
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
